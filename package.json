@@ -1,0 +1,21 @@
+{
+  "name": "cafehub",
+  "version": "1.0.0",
+  "description": "Complete Full-Stack Café E-Commerce & Management System",
+  "main": "server/server.js",
+  "scripts": {
+    "setup": "npm run setup:server && npm run setup:client",
+    "setup:server": "cd server && npm install",
+    "setup:client": "cd client && npm install",
+    "start": "node server/server.js",
+    "server": "cd server && npm run dev",
+    "client": "cd client && npm run dev",
+    "seed": "cd server && node seed.js",
+    "dev": "concurrently \"npm run server\" \"npm run client\""
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "author": "CaféHub Team",
+  "license": "ISC"
+}
