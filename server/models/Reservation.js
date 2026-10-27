@@ -40,7 +40,25 @@ const ReservationSchema = new mongoose.Schema(
       default: 'Pending'
     }
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true }
+  }
+);
+
+// Virtual field to seamlessly align partySize and guestCount
+ReservationSchema.virtual('guestCount').get(function () {
+  return this.partySize;
+});
+
+// Partial compound index to prevent double bookings on active reservations
+ReservationSchema.index(
+  { table: 1, date: 1, timeSlot: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { status: { $in: ['Pending', 'Confirmed'] } }
+  }
 );
 
 module.exports = mongoose.model('Reservation', ReservationSchema);

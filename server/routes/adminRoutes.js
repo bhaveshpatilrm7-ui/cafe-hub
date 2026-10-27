@@ -13,6 +13,7 @@ router.use(protect);
 router.use(authorize('admin'));
 
 router.get('/dashboard', getDashboardStats);
+router.get('/dashboard-stats', getDashboardStats);
 router.get('/inventory', getInventory);
 router.post('/inventory', saveInventory);
 router.delete('/inventory/:id', deleteInventory);

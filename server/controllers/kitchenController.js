@@ -5,7 +5,7 @@ const Order = require('../models/Order');
 // @access  Private/Staff/Admin
 exports.getKitchenOrders = async (req, res, next) => {
   try {
-    const activeStatuses = ['Pending', 'Confirmed', 'Preparing', 'Ready'];
+    const activeStatuses = ['Pending', 'Confirmed', 'Preparing', 'Ready', 'Out for Delivery'];
     const orders = await Order.find({ status: { $in: activeStatuses } })
       .populate('user', 'name phone')
       .sort({ createdAt: 1 }); // Oldest first for queue priority

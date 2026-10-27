@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 
 // Context Providers
 import { AuthProvider } from './context/AuthContext';
@@ -51,47 +51,118 @@ function App() {
 
                     {/* Customer Protected Routes */}
                     <Route path="/checkout" element={
-                      <ProtectedRoute>
+                      <ProtectedRoute allowedRoles={['customer', 'staff', 'admin']}>
                         <CheckoutPage />
                       </ProtectedRoute>
                     } />
                     <Route path="/order-confirmation/:orderId" element={
-                      <ProtectedRoute>
+                      <ProtectedRoute allowedRoles={['customer', 'staff', 'admin']}>
                         <OrderConfirmationPage />
                       </ProtectedRoute>
                     } />
                     <Route path="/orders" element={
-                      <ProtectedRoute>
+                      <ProtectedRoute allowedRoles={['customer', 'staff', 'admin']}>
                         <OrderHistoryPage />
                       </ProtectedRoute>
                     } />
                     <Route path="/orders/:orderId" element={
-                      <ProtectedRoute>
+                      <ProtectedRoute allowedRoles={['customer', 'staff', 'admin']}>
                         <OrderDetailsPage />
                       </ProtectedRoute>
                     } />
                     <Route path="/wishlist" element={
-                      <ProtectedRoute>
+                      <ProtectedRoute allowedRoles={['customer', 'staff', 'admin']}>
                         <WishlistPage />
                       </ProtectedRoute>
                     } />
                     <Route path="/profile" element={
-                      <ProtectedRoute>
+                      <ProtectedRoute allowedRoles={['customer', 'staff', 'admin']}>
                         <ProfilePage />
                       </ProtectedRoute>
                     } />
 
-                    {/* Staff & Kitchen Protected Route */}
-                    <Route path="/kitchen" element={
+                    {/* Staff Protected Routes */}
+                    <Route path="/staff" element={
                       <ProtectedRoute allowedRoles={['staff', 'admin']}>
                         <KitchenDashboardPage />
                       </ProtectedRoute>
                     } />
+                    <Route path="/staff/kitchen" element={
+                      <ProtectedRoute allowedRoles={['staff', 'admin']}>
+                        <KitchenDashboardPage />
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/staff/orders" element={
+                      <ProtectedRoute allowedRoles={['staff', 'admin']}>
+                        <KitchenDashboardPage />
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/staff/reservations" element={
+                      <ProtectedRoute allowedRoles={['staff', 'admin']}>
+                        <ReservationsPage />
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/staff/inventory" element={
+                      <ProtectedRoute allowedRoles={['staff', 'admin']}>
+                        <KitchenDashboardPage />
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/kitchen" element={<Navigate to="/staff/kitchen" replace />} />
 
-                    {/* Admin Protected Route */}
+                    {/* Admin Protected Routes */}
                     <Route path="/admin" element={
                       <ProtectedRoute allowedRoles={['admin']}>
                         <AdminDashboardPage />
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/admin/users" element={
+                      <ProtectedRoute allowedRoles={['admin']}>
+                        <AdminDashboardPage initialTab="users" />
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/admin/staff" element={
+                      <ProtectedRoute allowedRoles={['admin']}>
+                        <AdminDashboardPage initialTab="users" />
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/admin/products" element={
+                      <ProtectedRoute allowedRoles={['admin']}>
+                        <AdminDashboardPage initialTab="products" />
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/admin/categories" element={
+                      <ProtectedRoute allowedRoles={['admin']}>
+                        <AdminDashboardPage initialTab="categories" />
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/admin/orders" element={
+                      <ProtectedRoute allowedRoles={['admin']}>
+                        <AdminDashboardPage initialTab="orders" />
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/admin/inventory" element={
+                      <ProtectedRoute allowedRoles={['admin']}>
+                        <AdminDashboardPage initialTab="inventory" />
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/admin/coupons" element={
+                      <ProtectedRoute allowedRoles={['admin']}>
+                        <AdminDashboardPage initialTab="coupons" />
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/admin/reservations" element={
+                      <ProtectedRoute allowedRoles={['admin']}>
+                        <AdminDashboardPage initialTab="reservations" />
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/admin/analytics" element={
+                      <ProtectedRoute allowedRoles={['admin']}>
+                        <AdminDashboardPage initialTab="overview" />
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/admin/settings" element={
+                      <ProtectedRoute allowedRoles={['admin']}>
+                        <AdminDashboardPage initialTab="overview" />
                       </ProtectedRoute>
                     } />
 

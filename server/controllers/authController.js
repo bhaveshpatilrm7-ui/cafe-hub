@@ -164,6 +164,35 @@ exports.updateUserRoleStatus = async (req, res, next) => {
   }
 };
 
+// @desc    Create new staff member (Admin only)
+// @route   POST /api/auth/staff
+// @access  Private/Admin
+exports.createStaff = async (req, res, next) => {
+  try {
+    const { name, email, phone, password } = req.body;
+
+    const userExists = await User.findOne({ email });
+    if (userExists) {
+      return res.status(400).json({ success: false, error: 'User with this email already exists' });
+    }
+
+    const staffUser = await User.create({
+      name,
+      email,
+      phone,
+      password: password || 'staff123',
+      role: 'staff'
+    });
+
+    res.status(201).json({
+      success: true,
+      data: staffUser
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 // Helper function to get token from model, create cookie and send response
 const sendTokenResponse = (user, statusCode, res) => {
   const token = user.getSignedJwtToken();

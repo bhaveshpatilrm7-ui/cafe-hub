@@ -9,9 +9,15 @@ import {
 import API from '../services/api';
 import { useToast } from '../context/ToastContext';
 
-const AdminDashboardPage = () => {
-  const [activeTab, setActiveTab] = useState('overview');
+const AdminDashboardPage = ({ initialTab = 'overview' }) => {
+  const [activeTab, setActiveTab] = useState(initialTab);
   const { addToast } = useToast();
+
+  useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab]);
 
   // Data states
   const [stats, setStats] = useState(null);
@@ -45,6 +51,9 @@ const AdminDashboardPage = () => {
 
   const [showInventoryModal, setShowInventoryModal] = useState(false);
   const [invForm, setInvForm] = useState({ item: '', category: 'Dairy', quantity: 10, unit: 'kg', minThreshold: 3 });
+
+  const [showStaffModal, setShowStaffModal] = useState(false);
+  const [staffForm, setStaffForm] = useState({ name: '', email: '', phone: '', password: 'staff123' });
 
   // Fetch dashboard stats
   const fetchStats = async () => {
@@ -220,6 +229,22 @@ const AdminDashboardPage = () => {
       fetchTabContent();
     } catch (err) {
       addToast('Failed to save inventory item', 'error');
+    }
+  };
+
+  // Staff Account Creation (Admin)
+  const handleCreateStaff = async (e) => {
+    e.preventDefault();
+    try {
+      const res = await API.post('/auth/staff', staffForm);
+      if (res.data.success) {
+        addToast('Staff account created successfully!', 'success');
+        setShowStaffModal(false);
+        setStaffForm({ name: '', email: '', phone: '', password: 'staff123' });
+        fetchTabContent();
+      }
+    } catch (err) {
+      addToast(err.response?.data?.error || 'Failed to create staff account', 'error');
     }
   };
 
@@ -530,11 +555,14 @@ const AdminDashboardPage = () => {
                     <tbody>
                       {reservations.map(r => (
                         <tr key={r._id}>
-                          <td>{r.user?.name} ({r.user?.phone})</td>
-                          <td>Table {r.table?.tableNumber}</td>
+                          <td>
+                            <strong>#{r.reservationNumber}</strong><br />
+                            <small>{r.user?.name || 'Customer'} ({r.user?.phone || '—'})</small>
+                          </td>
+                          <td>Table {r.table?.tableNumber || 'Assigned'}</td>
                           <td>{r.date} @ {r.timeSlot}</td>
-                          <td>{r.guestCount} Guests</td>
-                          <td><span className={`badge ${r.status === 'Confirmed' ? 'badge-success' : 'badge-warning'}`}>{r.status}</span></td>
+                          <td>{r.partySize || r.guestCount} Guests</td>
+                          <td><span className={`badge ${r.status === 'Confirmed' ? 'badge-success' : r.status === 'Cancelled' ? 'badge-danger' : 'badge-warning'}`}>{r.status}</span></td>
                           <td>
                             <div className="table-actions">
                               <button className="btn btn-sm btn-primary" onClick={() => handleUpdateReservationStatus(r._id, 'Confirmed')}>Confirm</button>
@@ -632,7 +660,12 @@ const AdminDashboardPage = () => {
             {/* TAB 9: USERS */}
             {activeTab === 'users' && (
               <div className="users-tab">
-                <h3 className="mb-4">System Users ({usersList.length})</h3>
+                <div className="flex-between mb-4">
+                  <h3>System Users & Staff ({usersList.length})</h3>
+                  <button className="btn btn-primary" onClick={() => setShowStaffModal(true)}>
+                    <FiPlus /> Add Staff Member
+                  </button>
+                </div>
                 <div className="card table-responsive">
                   <table className="admin-table">
                     <thead>
@@ -839,6 +872,38 @@ const AdminDashboardPage = () => {
               <div className="modal-actions">
                 <button type="button" className="btn btn-secondary" onClick={() => setShowInventoryModal(false)}>Cancel</button>
                 <button type="submit" className="btn btn-primary">Save Inventory</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {/* Add Staff Modal */}
+      {showStaffModal && (
+        <div className="modal-overlay" onClick={() => setShowStaffModal(false)}>
+          <div className="card modal-content" onClick={(e) => e.stopPropagation()}>
+            <h3>Add New Staff Member Account</h3>
+            <form onSubmit={handleCreateStaff}>
+              <div className="form-group">
+                <label className="form-label">Staff Full Name</label>
+                <input type="text" className="form-input" placeholder="Chef Alex" value={staffForm.name} onChange={(e) => setStaffForm({ ...staffForm, name: e.target.value })} required />
+              </div>
+              <div className="grid-2">
+                <div className="form-group">
+                  <label className="form-label">Staff Email</label>
+                  <input type="email" className="form-input" placeholder="alex@cafehub.com" value={staffForm.email} onChange={(e) => setStaffForm({ ...staffForm, email: e.target.value })} required />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Phone Number</label>
+                  <input type="text" className="form-input" placeholder="9876543210" value={staffForm.phone} onChange={(e) => setStaffForm({ ...staffForm, phone: e.target.value })} required />
+                </div>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Initial Password</label>
+                <input type="password" className="form-input" placeholder="staff123" value={staffForm.password} onChange={(e) => setStaffForm({ ...staffForm, password: e.target.value })} required />
+              </div>
+              <div className="modal-actions">
+                <button type="button" className="btn btn-secondary" onClick={() => setShowStaffModal(false)}>Cancel</button>
+                <button type="submit" className="btn btn-primary">Create Staff Account</button>
               </div>
             </form>
           </div>

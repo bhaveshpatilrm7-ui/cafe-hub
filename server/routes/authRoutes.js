@@ -6,7 +6,8 @@ const {
   updateDetails,
   updatePassword,
   getUsers,
-  updateUserRoleStatus
+  updateUserRoleStatus,
+  createStaff
 } = require('../controllers/authController');
 
 const router = express.Router();
@@ -20,6 +21,7 @@ router.put('/updatepassword', protect, updatePassword);
 
 // Admin user management routes
 router.get('/users', protect, authorize('admin'), getUsers);
+router.post('/staff', protect, authorize('admin'), createStaff);
 router.put('/users/:id', protect, authorize('admin'), updateUserRoleStatus);
 
 module.exports = router;

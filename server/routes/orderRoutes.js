@@ -2,6 +2,7 @@ const express = require('express');
 const {
   createOrder,
   getOrders,
+  getMyOrders,
   getOrderById,
   updateOrderStatus,
   cancelOrder,
@@ -13,6 +14,9 @@ const router = express.Router();
 const { protect, authorize } = require('../middleware/auth');
 
 router.use(protect);
+
+router.get('/my-orders', getMyOrders);
+router.get('/admin/all', authorize('staff', 'admin'), getOrders);
 
 router.route('/')
   .post(createOrder)

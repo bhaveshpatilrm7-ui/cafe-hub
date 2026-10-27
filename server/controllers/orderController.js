@@ -170,7 +170,7 @@ exports.createOrder = async (req, res, next) => {
 // @access  Private
 exports.getOrders = async (req, res, next) => {
   try {
-    const { status, page = 1, limit = 10 } = req.query;
+    const { status, page = 1, limit = 50 } = req.query;
 
     let query = {};
     if (req.user.role === 'customer') {
@@ -205,6 +205,25 @@ exports.getOrders = async (req, res, next) => {
   }
 };
 
+// @desc    Get customer's own orders ONLY
+// @route   GET /api/orders/my-orders
+// @access  Private/Customer
+exports.getMyOrders = async (req, res, next) => {
+  try {
+    const orders = await Order.find({ user: req.user.id })
+      .populate('items.product', 'name image category')
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({
+      success: true,
+      count: orders.length,
+      data: orders
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 // @desc    Get order details
 // @route   GET /api/orders/:id
 // @access  Private
@@ -219,7 +238,7 @@ exports.getOrderById = async (req, res, next) => {
     }
 
     if (req.user.role === 'customer' && order.user._id.toString() !== req.user.id) {
-      return res.status(401).json({ success: false, error: 'Not authorized to view this order' });
+      return res.status(403).json({ success: false, error: 'Not authorized to view another customer\'s order' });
     }
 
     res.status(200).json({
@@ -236,11 +255,11 @@ exports.getOrderById = async (req, res, next) => {
 // @access  Private/Staff/Admin
 exports.updateOrderStatus = async (req, res, next) => {
   try {
-    const { status, comment } = req.body;
+    const status = req.body.status || req.body.orderStatus;
     const allowedStatuses = ['Pending', 'Confirmed', 'Preparing', 'Ready', 'Out for Delivery', 'Delivered', 'Cancelled'];
 
     if (!allowedStatuses.includes(status)) {
-      return res.status(400).json({ success: false, error: 'Invalid status' });
+      return res.status(400).json({ success: false, error: 'Invalid order status' });
     }
 
     const order = await Order.findById(req.params.id);
@@ -251,11 +270,12 @@ exports.updateOrderStatus = async (req, res, next) => {
     order.status = status;
     order.statusHistory.push({
       status,
-      comment: comment || `Status updated to ${status}`
+      comment: req.body.comment || `Status updated to ${status}`
     });
 
-    if (status === 'Delivered') {
+    if (status === 'Delivered' && order.paymentMethod === 'COD') {
       order.paymentStatus = 'Paid';
+      order.amountDue = 0;
     }
 
     await order.save();

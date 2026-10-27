@@ -8,5 +8,7 @@ router.use(protect);
 router.use(authorize('staff', 'admin'));
 
 router.get('/orders', getKitchenOrders);
+router.get('/queue', getKitchenOrders);
+router.get('/', getKitchenOrders);
 
 module.exports = router;

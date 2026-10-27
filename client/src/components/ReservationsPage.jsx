@@ -1,8 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { FiCalendar, FiClock, FiUsers, FiCheckCircle, FiXCircle } from 'react-icons/fi';
+import { FiCalendar, FiClock, FiUsers, FiCheckCircle, FiXCircle, FiX } from 'react-icons/fi';
 import API from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+
+const getTodayDateString = () => {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
 
 const ReservationsPage = () => {
   const { user } = useAuth();
@@ -10,15 +18,17 @@ const ReservationsPage = () => {
 
   const [tables, setTables] = useState([]);
   const [myReservations, setMyReservations] = useState([]);
+  const [bookedTableIds, setBookedTableIds] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // Form state
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [date, setDate] = useState(getTodayDateString());
   const [timeSlot, setTimeSlot] = useState('18:00');
   const [guestCount, setGuestCount] = useState(2);
   const [selectedTableId, setSelectedTableId] = useState('');
   const [specialRequest, setSpecialRequest] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [bookingSuccess, setBookingSuccess] = useState(null);
 
   const timeSlots = ['09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00'];
 
@@ -41,6 +51,27 @@ const ReservationsPage = () => {
     }
   };
 
+  // Check table availability for selected date & time
+  useEffect(() => {
+    const checkAvailability = async () => {
+      if (!date || !timeSlot) return;
+      try {
+        const aRes = await API.get('/reservations/availability', {
+          params: { date, timeSlot }
+        });
+        if (aRes.data.success) {
+          const booked = aRes.data.bookedTableIds || [];
+          setBookedTableIds(booked);
+          // If previously selected table is booked, deselect
+          setSelectedTableId((prev) => (booked.includes(prev) ? '' : prev));
+        }
+      } catch (err) {
+        console.error('Error checking table availability', err);
+      }
+    };
+    checkAvailability();
+  }, [date, timeSlot]);
+
   useEffect(() => {
     fetchData();
   }, [user]);
@@ -51,29 +82,82 @@ const ReservationsPage = () => {
       addToast('Please login to reserve a table', 'info');
       return;
     }
+    if (!date) {
+      addToast('Please select a reservation date', 'error');
+      return;
+    }
+    if (!timeSlot) {
+      addToast('Please select a time slot', 'error');
+      return;
+    }
+    const numGuests = Number(guestCount);
+    if (!numGuests || numGuests < 1) {
+      addToast('Please provide a valid number of guests (at least 1)', 'error');
+      return;
+    }
     if (!selectedTableId) {
       addToast('Please select a table from the list', 'error');
       return;
     }
 
+    const selectedTable = tables.find((t) => t._id === selectedTableId);
+    if (selectedTable && selectedTable.capacity < numGuests) {
+      addToast(
+        `Selected table capacity (${selectedTable.capacity}) is smaller than party size (${numGuests})`,
+        'error'
+      );
+      return;
+    }
+
+    if (bookedTableIds.includes(selectedTableId)) {
+      addToast('This table is already reserved for the selected date and time slot.', 'error');
+      return;
+    }
+
+    if (submitting) return;
     setSubmitting(true);
+
     try {
-      const res = await API.post('/reservations', {
+      const payload = {
+        table: selectedTableId,
         tableId: selectedTableId,
         date,
         timeSlot,
-        guestCount,
-        specialRequest
-      });
+        partySize: numGuests,
+        guestCount: numGuests,
+        specialRequest: specialRequest.trim(),
+        specialRequests: specialRequest.trim()
+      };
+
+      const res = await API.post('/reservations', payload);
 
       if (res.data.success) {
-        addToast('Table reservation submitted successfully!', 'success');
+        const created = res.data.data;
+        addToast('Table Reserved Successfully!', 'success');
+        setBookingSuccess({
+          reservationNumber: created.reservationNumber,
+          date: created.date,
+          timeSlot: created.timeSlot,
+          tableNumber: created.table?.tableNumber || selectedTable?.tableNumber,
+          guestCount: created.partySize || created.guestCount || numGuests
+        });
         setSelectedTableId('');
         setSpecialRequest('');
         fetchData();
+
+        // Refresh availability
+        const aRes = await API.get('/reservations/availability', {
+          params: { date, timeSlot }
+        });
+        if (aRes.data.success) {
+          setBookedTableIds(aRes.data.bookedTableIds || []);
+        }
       }
     } catch (err) {
-      addToast(err.response?.data?.error || 'Failed to book table. Table might be busy at this time.', 'error');
+      addToast(
+        err.response?.data?.error || 'Failed to book table. Table might be busy at this time.',
+        'error'
+      );
     } finally {
       setSubmitting(false);
     }
@@ -86,9 +170,16 @@ const ReservationsPage = () => {
       if (res.data.success) {
         addToast('Reservation cancelled', 'info');
         fetchData();
+        // Refresh availability
+        const aRes = await API.get('/reservations/availability', {
+          params: { date, timeSlot }
+        });
+        if (aRes.data.success) {
+          setBookedTableIds(aRes.data.bookedTableIds || []);
+        }
       }
     } catch (err) {
-      addToast('Error cancelling reservation', 'error');
+      addToast(err.response?.data?.error || 'Error cancelling reservation', 'error');
     }
   };
 
@@ -116,13 +207,55 @@ const ReservationsPage = () => {
           <div className="card booking-form-card">
             <h3><FiCalendar /> Table Reservation Form</h3>
 
+            {/* Success Booking Banner */}
+            {bookingSuccess && (
+              <div className="booking-success-box mb-6">
+                <div className="success-banner-header">
+                  <div className="flex-align gap-2">
+                    <FiCheckCircle className="text-success success-icon-lg" />
+                    <h4 className="m-0 text-success">Table Reserved Successfully!</h4>
+                  </div>
+                  <button
+                    type="button"
+                    className="close-success-btn"
+                    onClick={() => setBookingSuccess(null)}
+                    title="Dismiss"
+                  >
+                    <FiX />
+                  </button>
+                </div>
+                <div className="success-details-row mt-3">
+                  <div>
+                    <span className="detail-label">Reservation ID</span>
+                    <strong className="detail-value">{bookingSuccess.reservationNumber}</strong>
+                  </div>
+                  <div>
+                    <span className="detail-label">Table</span>
+                    <strong className="detail-value">Table {bookingSuccess.tableNumber}</strong>
+                  </div>
+                  <div>
+                    <span className="detail-label">Date</span>
+                    <strong className="detail-value">{bookingSuccess.date}</strong>
+                  </div>
+                  <div>
+                    <span className="detail-label">Time</span>
+                    <strong className="detail-value">{bookingSuccess.timeSlot}</strong>
+                  </div>
+                  <div>
+                    <span className="detail-label">Guests</span>
+                    <strong className="detail-value">{bookingSuccess.guestCount} Guests</strong>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <form onSubmit={handleBookTable}>
               <div className="form-group">
                 <label className="form-label">Reservation Date</label>
                 <input
                   type="date"
                   className="form-input"
-                  min={new Date().toISOString().split('T')[0]}
+                  min={getTodayDateString()}
                   value={date}
                   onChange={(e) => setDate(e.target.value)}
                   required
@@ -151,7 +284,15 @@ const ReservationsPage = () => {
                     max="10"
                     className="form-input"
                     value={guestCount}
-                    onChange={(e) => setGuestCount(Number(e.target.value))}
+                    onChange={(e) => {
+                      const val = Number(e.target.value);
+                      setGuestCount(val);
+                      // Clear selected table if it cannot accommodate new guest count
+                      const currentSelected = tables.find(t => t._id === selectedTableId);
+                      if (currentSelected && currentSelected.capacity < val) {
+                        setSelectedTableId('');
+                      }
+                    }}
                     required
                   />
                 </div>
@@ -160,19 +301,38 @@ const ReservationsPage = () => {
               {/* Table Selection Grid */}
               <div className="form-group">
                 <label className="form-label">Select Table:</label>
-                <div className="tables-select-grid">
-                  {availableTables.map((t) => (
-                    <div
-                      key={t._id}
-                      className={`table-select-card ${selectedTableId === t._id ? 'selected' : ''}`}
-                      onClick={() => setSelectedTableId(t._id)}
-                    >
-                      <div className="table-num">{t.tableNumber}</div>
-                      <div className="table-capacity">{t.capacity} Seats</div>
-                      <div className="table-loc">{t.location}</div>
-                    </div>
-                  ))}
-                </div>
+                {availableTables.length === 0 ? (
+                  <p className="text-muted mt-2">No tables found with capacity for {guestCount} guests.</p>
+                ) : (
+                  <div className="tables-select-grid">
+                    {availableTables.map((t) => {
+                      const isBooked = bookedTableIds.includes(t._id);
+                      const isSelected = selectedTableId === t._id;
+                      return (
+                        <div
+                          key={t._id}
+                          className={`table-select-card ${isSelected ? 'selected' : ''} ${isBooked ? 'booked' : ''}`}
+                          onClick={() => {
+                            if (isBooked) {
+                              addToast(`Table ${t.tableNumber} is already reserved for this date and time slot. Please choose another table.`, 'error');
+                              return;
+                            }
+                            setSelectedTableId(t._id);
+                          }}
+                        >
+                          <div className="table-num">{t.tableNumber}</div>
+                          <div className="table-capacity">{t.capacity} Seats</div>
+                          <div className="table-loc">{t.location}</div>
+                          {isBooked ? (
+                            <span className="table-status-pill pill-booked">Booked</span>
+                          ) : (
+                            <span className="table-status-pill pill-available">Available</span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
               <div className="form-group">
@@ -185,8 +345,12 @@ const ReservationsPage = () => {
                 ></textarea>
               </div>
 
-              <button type="submit" className="btn btn-primary btn-lg w-full" disabled={submitting || !selectedTableId}>
-                {submitting ? 'Booking...' : 'Confirm Reservation'}
+              <button
+                type="submit"
+                className="btn btn-primary btn-lg w-full"
+                disabled={submitting || !selectedTableId}
+              >
+                {submitting ? 'Confirming Reservation...' : 'Confirm Reservation'}
               </button>
             </form>
           </div>
@@ -209,7 +373,8 @@ const ReservationsPage = () => {
                   <div className="res-header">
                     <div>
                       <strong className="res-table">Table {res.table?.tableNumber || 'Assigned'}</strong>
-                      <span className="res-details">{res.date} at {res.timeSlot} ({res.guestCount} Guests)</span>
+                      <span className="res-ref">Ref: #{res.reservationNumber}</span>
+                      <span className="res-details">{res.date} at {res.timeSlot} ({res.partySize || res.guestCount} Guests)</span>
                     </div>
                     <span className={`badge ${res.status === 'Confirmed' ? 'badge-success' : res.status === 'Cancelled' ? 'badge-danger' : 'badge-warning'}`}>
                       {res.status}
@@ -249,6 +414,54 @@ const ReservationsPage = () => {
           gap: 10px;
         }
 
+        .booking-success-box {
+          background: #f0fdf4;
+          border: 1.5px solid #86efac;
+          border-radius: var(--radius-sm);
+          padding: 16px;
+        }
+
+        .success-banner-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        }
+
+        .success-icon-lg {
+          font-size: 1.4rem;
+        }
+
+        .close-success-btn {
+          background: transparent;
+          border: none;
+          cursor: pointer;
+          font-size: 1.2rem;
+          color: #4b5563;
+        }
+
+        .success-details-row {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+          gap: 10px;
+          background: #ffffff;
+          padding: 12px;
+          border-radius: 6px;
+          border: 1px solid #dcfce7;
+        }
+
+        .detail-label {
+          display: block;
+          font-size: 0.72rem;
+          text-transform: uppercase;
+          color: #6b7280;
+          font-weight: 600;
+        }
+
+        .detail-value {
+          font-size: 0.88rem;
+          color: var(--text-dark);
+        }
+
         .tables-select-grid {
           display: grid;
           grid-template-columns: repeat(3, 1fr);
@@ -263,11 +476,19 @@ const ReservationsPage = () => {
           text-align: center;
           cursor: pointer;
           transition: var(--transition);
+          position: relative;
         }
 
-        .table-select-card:hover, .table-select-card.selected {
+        .table-select-card:hover:not(.booked), .table-select-card.selected {
           border-color: var(--primary);
           background: var(--cream-subtle);
+        }
+
+        .table-select-card.booked {
+          background: #f8fafc;
+          border-color: #e2e8f0;
+          opacity: 0.65;
+          cursor: not-allowed;
         }
 
         .table-num {
@@ -278,6 +499,26 @@ const ReservationsPage = () => {
 
         .table-capacity { font-size: 0.8rem; color: var(--accent-hover); font-weight: 600; }
         .table-loc { font-size: 0.75rem; color: var(--text-muted); }
+
+        .table-status-pill {
+          display: inline-block;
+          font-size: 0.68rem;
+          font-weight: 700;
+          padding: 2px 6px;
+          border-radius: 4px;
+          margin-top: 4px;
+          text-transform: uppercase;
+        }
+
+        .pill-available {
+          background: #e8f5e9;
+          color: #2e7d32;
+        }
+
+        .pill-booked {
+          background: #ffebee;
+          color: #c62828;
+        }
 
         .my-reservations-wrapper {
           display: flex;
@@ -291,11 +532,12 @@ const ReservationsPage = () => {
 
         .res-header {
           display: flex;
-          align-items: center;
+          align-items: flex-start;
           justify-content: space-between;
         }
 
         .res-table { display: block; color: var(--primary); font-size: 1.05rem; }
+        .res-ref { display: block; font-size: 0.78rem; font-family: monospace; color: var(--accent-hover); font-weight: 600; margin-bottom: 2px; }
         .res-details { font-size: 0.85rem; color: var(--text-muted); }
         .res-req { font-size: 0.8rem; font-style: italic; margin-top: 6px; color: var(--text-muted); }
 
