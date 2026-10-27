@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const API = axios.create({
-  baseURL: '/api',
+  baseURL: 'https://cafe-hub-rp34.onrender.com/api',
   headers: {
     'Content-Type': 'application/json'
   }
