@@ -21,7 +21,7 @@ const adminRoutes = require('./routes/adminRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 
 const app = express();
-
+app.set('trust proxy', 1);
 // Security Middlewares
 app.use(helmet());
 
