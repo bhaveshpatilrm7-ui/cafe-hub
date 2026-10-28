@@ -61,7 +61,7 @@ const Footer = () => {
             </div>
             <div className="contact-item">
               <FiMail className="c-icon" />
-              <span>xhamaster.com(also for sex)</span>
+              <span>hello@cafehub.com</span>
             </div>
           </div>
         </div>
