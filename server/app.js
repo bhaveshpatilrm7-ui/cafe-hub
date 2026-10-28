@@ -28,15 +28,18 @@ app.use(helmet());
 // Enable CORS
 const allowedOrigins = process.env.CLIENT_URL
   ? process.env.CLIENT_URL.split(',').map((o) => o.trim())
-  : ['http://localhost:5173', 'http://localhost:3000'];
+  : [];
 
 const corsOptions = {
   origin: (origin, callback) => {
-    // Allow requests with no origin (mobile apps, curl, Postman, same-origin)
+    // Allow requests with no origin (curl, Postman, same-origin server calls)
     if (!origin) return callback(null, true);
+    // Allow explicitly listed origins from CLIENT_URL env var
     if (allowedOrigins.includes(origin)) return callback(null, true);
-    // In development mode allow everything
-    if (process.env.NODE_ENV !== 'production') return callback(null, true);
+    // Always allow any Vercel preview/production deployment (*.vercel.app)
+    if (/^https:\/\/[^.]+\.vercel\.app$/.test(origin)) return callback(null, true);
+    // Always allow localhost on any port (local development)
+    if (/^http:\/\/localhost(:\d+)?$/.test(origin)) return callback(null, true);
     callback(new Error(`CORS: Origin ${origin} not allowed`));
   },
   credentials: true
